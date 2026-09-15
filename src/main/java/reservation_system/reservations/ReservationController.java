@@ -1,5 +1,6 @@
-package reservation_system;
+package reservation_system.reservations;
 
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -7,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/reservation")
@@ -26,24 +26,30 @@ public class ReservationController {
             @PathVariable("id") Long id
             ){
         log.info("Called method getReservationById: id = {}", id);
-        try {
-            return ResponseEntity.status(HttpStatus.OK)
-                    .body(reservationService.getReservationById(id));
-        } catch (NoSuchElementException exeption){
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(reservationService.getReservationById(id));
     }
 
     @GetMapping
-    public ResponseEntity<List<Reservation>> getAllReservations(){
+    public ResponseEntity<List<Reservation>> getAllReservations(
+            @RequestParam(value = "roomId", required = false) Long roomId,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @RequestParam(value = "pageNumber", required = false) Integer pageNumber
+    ){
         log.info("Called method getAllReservations");
-        return ResponseEntity.ok(reservationService.findAllReservations());
+        var filter = new ReservationSearchFilter(
+                roomId,
+                userId,
+                pageSize,
+                pageNumber
+        );
+        return ResponseEntity.ok(reservationService.searchAllByFilter(filter));
     }
 
     @PostMapping
     public ResponseEntity<Reservation> createReservation(
-            @RequestBody Reservation reservationToCreate
+            @RequestBody @Valid Reservation reservationToCreate
     ){
         log.info("Called createReservation");
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -54,7 +60,7 @@ public class ReservationController {
     @PutMapping("/{id}")
     public ResponseEntity<Reservation> updateReservation(
         @PathVariable("id") Long id,
-        @RequestBody Reservation reservationToUpdate
+        @RequestBody @Valid Reservation reservationToUpdate
     ){
         log.info("Called method updateReservation, id = {}, reservationToUpdate = {}", id, reservationToUpdate);
         var updated = reservationService.updateReservation(id, reservationToUpdate);
@@ -67,13 +73,8 @@ public class ReservationController {
             @PathVariable("id") Long id
     ){
         log.info("Called method cancelReservation, id= {}", id);
-        try {
-            reservationService.cancelReservation(id);
-            return ResponseEntity.status(HttpStatus.OK).build();
-        } catch (NoSuchElementException exeption){
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
-
+        reservationService.cancelReservation(id);
+        return ResponseEntity.status(HttpStatus.OK).build();
     }
 
     @PostMapping("/{id}/approve")
