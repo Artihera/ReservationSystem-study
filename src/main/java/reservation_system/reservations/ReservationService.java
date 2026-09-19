@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import reservation_system.reservations.availabitily.ReservationAvailabilityService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -18,16 +17,13 @@ public class ReservationService {
     private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
 
     private final ReservationRepository repository;
-    private final ReservationAvailabilityService availabilityService;
     private final ReservationMapper mapper;
 
     public ReservationService(
             ReservationRepository repository,
-            ReservationAvailabilityService availabilityService,
             ReservationMapper mapper)
     {
         this.repository = repository;
-        this.availabilityService = availabilityService;
         this.mapper = mapper;
     }
 
@@ -111,18 +107,36 @@ public class ReservationService {
         if (reservationEntity.getStatus() != ReservationStatus.PENDING){
             throw new IllegalStateException("Cannot approve reservation with status: " + reservationEntity.getStatus());
         }
-        boolean isAvailableToApprove = availabilityService.isReservationAvailable(
+        boolean isConflicting = isAlreadyReserved(
                 reservationEntity.getRoomId(),
                 reservationEntity.getStartDate(),
                 reservationEntity.getEndDate()
         );
-        if (!isAvailableToApprove){
+        if (isConflicting){
             throw new IllegalStateException("Cannot approve reservation, date confliction");
         }
         reservationEntity.setStatus(ReservationStatus.APPROVED);
         repository.save(reservationEntity);
 
         return mapper.toDomain(reservationEntity);
+    }
+
+    private boolean isAlreadyReserved(
+            Long roomId,
+            LocalDate startDate,
+            LocalDate endDate
+    ){
+        List<Long> conflictingIds = repository.findConflictReservationIds(
+                roomId,
+                startDate,
+                endDate,
+                ReservationStatus.APPROVED
+        );
+        if (conflictingIds.isEmpty()){
+            return false;
+        }
+        log.info("Conflicting with IDs = {}", conflictingIds);
+        return  true;
     }
 
 }
